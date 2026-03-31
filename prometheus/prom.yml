@@ -1,16 +1,16 @@
- global:                                                                       
-    scrape_interval: 15s # Default scrape interval
-                                                                                
-  scrape_configs:                                                               
-    - job_name: 'prometheus'
-      static_configs:                                                           
-        - targets: ['localhost:9090']                                           
-                                                                                
-    # Ton app NestJS                           
-    - job_name: 'nestjs-olympia'                                                
-      scheme: http                                                              
-      static_configs:
-        - targets: ['kun-nestjs.railway.internal:8000']                         
-      metrics_path: '/internal/metrics'                                         
-      authorization:                                                            
-        credentials_file: /etc/prometheus/metrics_api_key 
+global:
+  scrape_interval: 15s # Default scrape interval
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Ton app NestJS
+  - job_name: 'nestjs-olympia'
+    scheme: http
+    static_configs:
+      - targets: ['kun-nestjs.railway.internal:8000']
+    metrics_path: '/internal/metrics'
+    authorization:
+      credentials_file: /etc/prometheus/metrics_api_key
