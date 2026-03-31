@@ -1,0 +1,254 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: application-alerts
+    folder: Application
+    interval: 1m
+    rules:
+      # Alert 1: High 5xx error rate
+      - uid: high-5xx-error-rate
+        title: High 5xx Error Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+              intervalMs: 15000
+              maxDataPoints: 20
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: sum(rate(http_requests_total[5m])) or vector(0)
+              intervalMs: 15000
+              maxDataPoints: 20
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: ($A / $B) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Taux d'erreur 5xx superieur a 5%"
+          description: "Plus de 5% des requetes retournent une erreur 500+. Verifier Sentry et les logs."
+
+      # Alert 2: Rate limiting spike (429)
+      - uid: rate-limiting-spike
+        title: Rate Limiting Spike
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: sum(rate(app_errors_total{status_code="429"}[5m])) > 0.03
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Spike de 429 - Rate limiting actif"
+          description: "Plus de 10 requetes bloquees par le rate limiter en 5 minutes. Verifier si c'est du trafic interne ou une attaque."
+
+      # Alert 3: High latency P95
+      - uid: high-latency-p95
+        title: High Latency P95
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Latence P95 superieure a 2 secondes"
+          description: "Le temps de reponse P95 depasse 2s. Verifier la base de donnees, Redis, et les APIs externes."
+
+      # Alert 4: Critical latency P95
+      - uid: critical-latency-p95
+        title: Critical Latency P95
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Latence P95 critique - superieure a 5 secondes"
+          description: "Le temps de reponse P95 depasse 5s. Incident performance en cours."
+
+  - orgId: 1
+    name: infrastructure-alerts
+    folder: Infrastructure
+    interval: 1m
+    rules:
+      # Alert 5: Scrape target down
+      - uid: scrape-target-down
+        title: NestJS Backend Down
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: up{job="nestjs-olympia"} == 0
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 2m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Backend NestJS inaccessible"
+          description: "Prometheus ne peut plus scraper le backend NestJS. Le service est peut-etre down. Verifier Railway."
+
+      # Alert 6: High memory usage
+      - uid: high-memory-usage
+        title: High Memory Usage
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: process_resident_memory_bytes > 536870912
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Utilisation memoire superieure a 512MB"
+          description: "Le process NestJS utilise plus de 512MB de RAM. Possible memory leak."
+
+      # Alert 7: Event loop lag
+      - uid: event-loop-lag
+        title: Event Loop Lag High
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: nodejs_eventloop_lag_seconds > 0.1
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Event loop lag superieur a 100ms"
+          description: "Le event loop Node.js est bloque. Code synchrone bloquant ou surcharge CPU."
+
+  - orgId: 1
+    name: queue-alerts
+    folder: Queues
+    interval: 1m
+    rules:
+      # Alert 8: Queue backlog
+      - uid: queue-backlog-warning
+        title: Queue Backlog Growing
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: bullmq_queue_size{status="waiting"} > 100
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Queue {{ $labels.queue }} saturee - plus de 100 jobs en attente"
+          description: "La queue {{ $labels.queue }} a {{ $value }} jobs en attente depuis 5 minutes. Verifier si les workers tournent."
+
+      # Alert 9: Queue blocked
+      - uid: queue-blocked-critical
+        title: Queue Blocked
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: bullmq_queue_size{status="waiting"} > 500
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Queue {{ $labels.queue }} bloquee - plus de 500 jobs en attente"
+          description: "La queue {{ $labels.queue }} a {{ $value }} jobs en attente. Les processors sont probablement down."
+
+      # Alert 10: Failed jobs accumulating
+      - uid: failed-jobs-accumulating
+        title: Failed Jobs Accumulating
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: grafana_prometheus
+            model:
+              expr: bullmq_queue_size{status="failed"} > 50
+              intervalMs: 15000
+              maxDataPoints: 20
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Queue {{ $labels.queue }} - plus de 50 jobs echoues"
+          description: "La queue {{ $labels.queue }} accumule des jobs echoues ({{ $value }}). Verifier les logs des processors."

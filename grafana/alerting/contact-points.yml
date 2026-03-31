@@ -1,0 +1,24 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord-alerts
+    receivers:
+      - uid: discord-main
+        type: discord
+        settings:
+          url: ${DISCORD_WEBHOOK_URL}
+          title: >-
+            {{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} {{ .CommonLabels.alertname }}
+          message: >-
+            **Status:** {{ .Status | toUpper }}
+
+            **Severity:** {{ .CommonLabels.severity }}
+
+            {{ range .Alerts }}
+            **{{ .Labels.alertname }}**
+            {{ .Annotations.summary }}
+            {{ if .Annotations.description }}> {{ .Annotations.description }}{{ end }}
+            {{ end }}
+          use_discord_username: true
+          avatar_url: https://grafana.com/static/assets/img/fav32.png
