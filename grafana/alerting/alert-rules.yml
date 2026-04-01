@@ -6,10 +6,10 @@ groups:
     folder: Application
     interval: 1m
     rules:
-      # Alert 1: High 5xx error rate
+      # Alert 1: High 5xx error rate (only fires with sufficient traffic)
       - uid: high-5xx-error-rate
         title: High 5xx Error Rate
-        condition: C
+        condition: A
         data:
           - refId: A
             relativeTimeRange:
@@ -17,26 +17,9 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) or vector(0)
+              expr: (sum(rate(http_requests_total{status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 0.001)) * 100 > 5 and sum(rate(http_requests_total[5m])) > 0.01
               intervalMs: 15000
               maxDataPoints: 20
-          - refId: B
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: grafana_prometheus
-            model:
-              expr: sum(rate(http_requests_total[5m])) or vector(0)
-              intervalMs: 15000
-              maxDataPoints: 20
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: __expr__
-            model:
-              type: math
-              expression: ($A / $B) * 100 > 5
         noDataState: OK
         for: 5m
         labels:
