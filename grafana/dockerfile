@@ -2,6 +2,10 @@ ARG VERSION=11.5.2
 
 FROM grafana/grafana-oss:${VERSION}
 
+USER root
+RUN apk add --no-cache gettext
+USER grafana
+
 # Datasources
 COPY datasources /etc/grafana/provisioning/datasources
 
@@ -13,3 +17,8 @@ COPY dashboards/config /etc/grafana/provisioning/dashboards
 
 # Dashboard JSON files
 COPY dashboards/json /var/lib/grafana/dashboards
+
+# Entrypoint that substitutes env vars in provisioning files
+COPY entrypoint.sh /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
