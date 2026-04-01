@@ -6,10 +6,10 @@ groups:
     folder: Application
     interval: 1m
     rules:
-      # Alert 1: High 5xx error rate (only fires with sufficient traffic)
+      # Alert 1: High 5xx error rate (>5% with minimum traffic)
       - uid: high-5xx-error-rate
         title: High 5xx Error Rate
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -17,10 +17,55 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: (sum(rate(http_requests_total{status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_requests_total[5m])), 0.001)) * 100 > 5 and sum(rate(http_requests_total[5m])) > 0.01
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: >-
+                (sum(rate(http_requests_total{status_code=~"5.."}[5m])) or vector(0))
+                / clamp_min(sum(rate(http_requests_total[5m])), 0.001) * 100
+                and sum(rate(http_requests_total[5m])) > 0.01
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: critical
@@ -28,11 +73,12 @@ groups:
         annotations:
           summary: "Taux d'erreur 5xx superieur a 5%"
           description: "Plus de 5% des requetes retournent une erreur 500+. Verifier Sentry et les logs."
+        isPaused: false
 
       # Alert 2: Rate limiting spike (429)
       - uid: rate-limiting-spike
         title: Rate Limiting Spike
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -40,22 +86,65 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: sum(rate(app_errors_total{status_code="429"}[5m])) > 0.03
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: sum(increase(app_errors_total{status_code="429"}[5m])) or vector(0)
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: critical
           team: backend
         annotations:
           summary: "Spike de 429 - Rate limiting actif"
-          description: "Plus de 10 requetes bloquees par le rate limiter en 5 minutes. Verifier si c'est du trafic interne ou une attaque."
+          description: "Plus de 10 requetes bloquees par le rate limiter en 5 minutes."
+        isPaused: false
 
-      # Alert 3: High latency P95
+      # Alert 3: High latency P95 > 2s
       - uid: high-latency-p95
         title: High Latency P95
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -63,22 +152,65 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: warning
           team: backend
         annotations:
           summary: "Latence P95 superieure a 2 secondes"
-          description: "Le temps de reponse P95 depasse 2s. Verifier la base de donnees, Redis, et les APIs externes."
+          description: "Le temps de reponse P95 depasse 2s. Verifier la base de donnees et les APIs externes."
+        isPaused: false
 
-      # Alert 4: Critical latency P95
+      # Alert 4: Critical latency P95 > 5s
       - uid: critical-latency-p95
         title: Critical Latency P95
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -86,10 +218,52 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 3m
         labels:
           severity: critical
@@ -97,6 +271,7 @@ groups:
         annotations:
           summary: "Latence P95 critique - superieure a 5 secondes"
           description: "Le temps de reponse P95 depasse 5s. Incident performance en cours."
+        isPaused: false
 
   - orgId: 1
     name: infrastructure-alerts
@@ -106,7 +281,7 @@ groups:
       # Alert 5: Scrape target down
       - uid: scrape-target-down
         title: NestJS Backend Down
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -114,22 +289,65 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: up{job="nestjs-olympia"} == 0
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: up{job="nestjs-olympia"}
               intervalMs: 15000
               maxDataPoints: 20
-        noDataState: OK
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
         for: 2m
         labels:
           severity: critical
           team: infrastructure
         annotations:
           summary: "Backend NestJS inaccessible"
-          description: "Prometheus ne peut plus scraper le backend NestJS. Le service est peut-etre down. Verifier Railway."
+          description: "Prometheus ne peut plus scraper le backend NestJS. Le service est peut-etre down."
+        isPaused: false
 
-      # Alert 6: High memory usage
+      # Alert 6: High memory usage > 512MB
       - uid: high-memory-usage
         title: High Memory Usage
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -137,10 +355,52 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: process_resident_memory_bytes > 536870912
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: process_resident_memory_bytes
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 536870912
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 10m
         labels:
           severity: warning
@@ -148,39 +408,17 @@ groups:
         annotations:
           summary: "Utilisation memoire superieure a 512MB"
           description: "Le process NestJS utilise plus de 512MB de RAM. Possible memory leak."
-
-      # Alert 7: Event loop lag
-      - uid: event-loop-lag
-        title: Event Loop Lag High
-        condition: A
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: grafana_prometheus
-            model:
-              expr: nodejs_eventloop_lag_seconds > 0.1
-              intervalMs: 15000
-              maxDataPoints: 20
-        noDataState: OK
-        for: 5m
-        labels:
-          severity: warning
-          team: infrastructure
-        annotations:
-          summary: "Event loop lag superieur a 100ms"
-          description: "Le event loop Node.js est bloque. Code synchrone bloquant ou surcharge CPU."
+        isPaused: false
 
   - orgId: 1
     name: queue-alerts
     folder: Queues
     interval: 1m
     rules:
-      # Alert 8: Queue backlog
+      # Alert 7: Queue backlog > 100
       - uid: queue-backlog-warning
         title: Queue Backlog Growing
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -188,22 +426,65 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: bullmq_queue_size{status="waiting"} > 100
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: max(bullmq_queue_size{status="waiting"})
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 100
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: warning
           team: backend
         annotations:
-          summary: "Queue {{ $labels.queue }} saturee - plus de 100 jobs en attente"
-          description: "La queue {{ $labels.queue }} a {{ $value }} jobs en attente depuis 5 minutes. Verifier si les workers tournent."
+          summary: "Une queue BullMQ a plus de 100 jobs en attente"
+          description: "Verifier si les workers tournent correctement."
+        isPaused: false
 
-      # Alert 9: Queue blocked
+      # Alert 8: Queue blocked > 500
       - uid: queue-blocked-critical
         title: Queue Blocked
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -211,22 +492,65 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: bullmq_queue_size{status="waiting"} > 500
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: max(bullmq_queue_size{status="waiting"})
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 500
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: critical
           team: backend
         annotations:
-          summary: "Queue {{ $labels.queue }} bloquee - plus de 500 jobs en attente"
-          description: "La queue {{ $labels.queue }} a {{ $value }} jobs en attente. Les processors sont probablement down."
+          summary: "Une queue BullMQ est bloquee - plus de 500 jobs en attente"
+          description: "Les processors sont probablement down. Verifier les logs."
+        isPaused: false
 
-      # Alert 10: Failed jobs accumulating
+      # Alert 9: Failed jobs > 50
       - uid: failed-jobs-accumulating
         title: Failed Jobs Accumulating
-        condition: A
+        condition: C
         data:
           - refId: A
             relativeTimeRange:
@@ -234,14 +558,57 @@ groups:
               to: 0
             datasourceUid: grafana_prometheus
             model:
-              expr: bullmq_queue_size{status="failed"} > 50
+              datasource:
+                type: prometheus
+                uid: grafana_prometheus
+              expr: max(bullmq_queue_size{status="failed"})
               intervalMs: 15000
               maxDataPoints: 20
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 50
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
         noDataState: OK
+        execErrState: OK
         for: 5m
         labels:
           severity: warning
           team: backend
         annotations:
-          summary: "Queue {{ $labels.queue }} - plus de 50 jobs echoues"
-          description: "La queue {{ $labels.queue }} accumule des jobs echoues ({{ $value }}). Verifier les logs des processors."
+          summary: "Plus de 50 jobs echoues dans une queue BullMQ"
+          description: "Verifier les logs des processors pour identifier la cause."
+        isPaused: false
