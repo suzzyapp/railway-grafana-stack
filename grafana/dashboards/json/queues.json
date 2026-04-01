@@ -1,0 +1,176 @@
+{
+  "uid": "bullmq-queues",
+  "title": "BullMQ Queues Dashboard",
+  "tags": ["bullmq", "queues", "jobs"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "queue",
+        "type": "query",
+        "datasource": { "uid": "grafana_prometheus" },
+        "query": "label_values(bullmq_queue_size, queue)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 2,
+        "sort": 1,
+        "label": "Queue"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Queue Status (Real-Time)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "title": "Waiting Jobs",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{status=\"waiting\", queue=~\"$queue\"}", "legendFormat": "{{queue}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 200 }] }
+        }
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "title": "Active Jobs",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{status=\"active\", queue=~\"$queue\"}", "legendFormat": "{{queue}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 50 }] }
+        }
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "title": "Failed Jobs",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{status=\"failed\", queue=~\"$queue\"}", "legendFormat": "{{queue}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 50 }] }
+        }
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "title": "Delayed Jobs",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 7 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{status=\"delayed\", queue=~\"$queue\"}", "legendFormat": "{{queue}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "orange", "value": 100 }] }
+        }
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "title": "Completed Jobs",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 7 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{status=\"completed\", queue=~\"$queue\"}", "legendFormat": "{{queue}}" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "options": { "orientation": "horizontal", "displayMode": "gradient" }
+    },
+    {
+      "title": "Queue Health Summary",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 7 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [
+        { "expr": "bullmq_queue_size{status=\"waiting\", queue=~\"$queue\"}", "format": "table", "instant": true, "refId": "A" },
+        { "expr": "bullmq_queue_size{status=\"active\", queue=~\"$queue\"}", "format": "table", "instant": true, "refId": "B" },
+        { "expr": "bullmq_queue_size{status=\"failed\", queue=~\"$queue\"}", "format": "table", "instant": true, "refId": "C" },
+        { "expr": "bullmq_queue_size{status=\"delayed\", queue=~\"$queue\"}", "format": "table", "instant": true, "refId": "D" }
+      ],
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "queue" } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "status": true, "status 1": true, "status 2": true, "status 3": true, "status 4": true }, "renameByName": { "queue": "Queue", "Value #A": "Waiting", "Value #B": "Active", "Value #C": "Failed", "Value #D": "Delayed" } } }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Queue Status Over Time",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
+    },
+    {
+      "title": "All Queues - Status Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "bullmq_queue_size{queue=~\"$queue\"}", "legendFormat": "{{queue}} — {{status}}" }],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never" } },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": ".*waiting.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*active.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*failed.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*delayed.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": ".*completed.*" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      },
+      "options": { "legend": { "calcs": ["last"], "displayMode": "table", "placement": "right" } }
+    },
+    {
+      "type": "row",
+      "title": "Job Processing (appears after first job is processed)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
+    },
+    {
+      "title": "Jobs Processed Rate (per sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [
+        { "expr": "sum by (queue) (rate(bullmq_jobs_processed_total{status=\"completed\", queue=~\"$queue\"}[5m]))", "legendFormat": "{{queue}} completed" },
+        { "expr": "sum by (queue) (rate(bullmq_jobs_processed_total{status=\"failed\", queue=~\"$queue\"}[5m]))", "legendFormat": "{{queue}} failed" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "title": "Job Duration P95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, queue) (rate(bullmq_job_duration_seconds_bucket{queue=~\"$queue\"}[5m])))", "legendFormat": "{{queue}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } } }
+    },
+    {
+      "title": "Total Jobs by Queue & Status",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 33 },
+      "datasource": { "uid": "grafana_prometheus" },
+      "targets": [
+        { "expr": "sum by (queue) (bullmq_jobs_processed_total{status=\"completed\", queue=~\"$queue\"})", "format": "table", "instant": true, "refId": "A" },
+        { "expr": "sum by (queue) (bullmq_jobs_processed_total{status=\"failed\", queue=~\"$queue\"})", "format": "table", "instant": true, "refId": "B" }
+      ],
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "queue" } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "Time 1": true, "Time 2": true }, "renameByName": { "queue": "Queue", "Value #A": "Completed", "Value #B": "Failed" } } }
+      ]
+    }
+  ]
+}
