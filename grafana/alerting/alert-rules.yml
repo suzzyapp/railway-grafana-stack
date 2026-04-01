@@ -37,6 +37,7 @@ groups:
             model:
               type: math
               expression: ($A / $B) * 100 > 5
+        noDataState: OK
         for: 5m
         labels:
           severity: critical
@@ -59,6 +60,7 @@ groups:
               expr: sum(rate(app_errors_total{status_code="429"}[5m])) > 0.03
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: critical
@@ -81,6 +83,7 @@ groups:
               expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
@@ -103,6 +106,7 @@ groups:
               expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 5
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 3m
         labels:
           severity: critical
@@ -130,6 +134,7 @@ groups:
               expr: up{job="nestjs-olympia"} == 0
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 2m
         labels:
           severity: critical
@@ -152,6 +157,7 @@ groups:
               expr: process_resident_memory_bytes > 536870912
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 10m
         labels:
           severity: warning
@@ -174,6 +180,7 @@ groups:
               expr: nodejs_eventloop_lag_seconds > 0.1
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
@@ -201,6 +208,7 @@ groups:
               expr: bullmq_queue_size{status="waiting"} > 100
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
@@ -223,6 +231,7 @@ groups:
               expr: bullmq_queue_size{status="waiting"} > 500
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: critical
@@ -245,6 +254,7 @@ groups:
               expr: bullmq_queue_size{status="failed"} > 50
               intervalMs: 15000
               maxDataPoints: 20
+        noDataState: OK
         for: 5m
         labels:
           severity: warning
